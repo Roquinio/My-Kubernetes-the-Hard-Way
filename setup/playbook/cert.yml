@@ -1,0 +1,57 @@
+- hosts:
+    - datacenter
+  gather_facts: yes  
+  become: yes
+  tasks: 
+    - name: Create directory
+      file:
+        path: /srv/cert
+        state: directory
+        mode: '0755'
+
+    - name: Upload cert on Worker1
+      when: inventory_hostname in groups['worker1']
+      copy: 
+        src: "../../bin/{{ item }}"
+        dest: "/srv/cert/"
+        owner: root
+        group: root
+      loop:
+        - ca.pem
+        - worker1-key.pem
+        - worker1.pem
+        - kubeconfig/worker1/worker1.kubeconfig
+        - kubeconfig/worker1/kube-proxy.kubeconfig
+
+    - name: Upload cert on Worker2
+      when: inventory_hostname in groups['worker2']
+      copy: 
+        src: "../../bin/{{ item }}"
+        dest: "/srv/cert/"
+        owner: root
+        group: root
+      loop:
+        - ca.pem
+        - worker2-key.pem
+        - worker2.pem
+        - kubeconfig/worker2/worker2.kubeconfig
+        - kubeconfig/worker2/kube-proxy.kubeconfig
+
+    - name: Upload cert on Master
+      when: inventory_hostname in groups['master']
+      copy: 
+        src: "../../bin/{{ item }}"
+        dest: "/srv/cert/"
+        owner: root
+        group: root
+      loop:
+        - ca.pem
+        - ca-key.pem
+        - kubernetes-key.pem 
+        - kubernetes.pem
+        - service-account-key.pem 
+        - service-account.pem
+        - kubeconfig/admin/admin.kubeconfig
+        - kubeconfig/master1/kube-controller-manager.kubeconfig
+        - kubeconfig/master1/kube-scheduler.kubeconfig
+        - encryption-config.yaml

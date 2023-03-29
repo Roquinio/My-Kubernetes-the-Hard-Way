@@ -1,0 +1,125 @@
+- hosts:
+    - master
+  gather_facts: yes  
+  become: yes
+  tasks: 
+    - name: Create the Kubernetes configuration directory
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0644'
+      loop:
+        - /etc/kubernetes/config
+        - /var/lib/kubernetes/
+
+    - name: Download the official Kubernetes release binaries
+      get_url:
+        url: "{{ item }}"
+        dest: /usr/local/bin/
+        mode: '0755'
+      loop:
+      - https://storage.googleapis.com/kubernetes-release/release/v1.26.0/bin/linux/amd64/kube-apiserver
+      - https://storage.googleapis.com/kubernetes-release/release/v1.26.0/bin/linux/amd64/kube-controller-manager
+      - https://storage.googleapis.com/kubernetes-release/release/v1.26.0/bin/linux/amd64/kube-scheduler
+
+    - name: Moove certificate & kubeconfig
+      copy:
+        src: "/srv/cert/{{ item }}" 
+        dest: /var/lib/kubernetes/
+        owner: root
+        group: root
+        mode: '0755'
+        remote_src: yes
+      loop:
+        - ca.pem
+        - ca-key.pem
+        - kubernetes-key.pem
+        - kubernetes.pem
+        - service-account-key.pem
+        - service-account.pem
+        - encryption-config.yaml
+        - kube-controller-manager.kubeconfig
+        - kube-scheduler.kubeconfig
+
+    - name: Create Kube API service
+      template:
+        src: ../template/kubeapi.j2
+        dest: /etc/systemd/system/kube-apiserver.service
+        mode: 0644
+    
+    - name: Create Kube Controller Manager service
+      template:
+        src: ../template/kubemngt.j2
+        dest: /etc/systemd/system/kube-controller-manager.service
+        mode: 0644
+
+    - name: Upload scheduler configuration
+      copy: 
+        src: "../etc/kube-scheduler.yaml"
+        dest: "/etc/kubernetes/config/"
+        owner: root
+        group: root
+
+    - name: Create Kube scheduler service
+      template:
+        src: ../template/kubescheduler.j2
+        dest: /etc/systemd/system/kube-scheduler.service
+        mode: 0644
+
+    - name: Reload Daemon Systemd
+      systemd:
+        daemon_reload: true
+    
+    - name: Start Kubernetes service
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop: 
+        - kube-apiserver 
+        - kube-controller-manager 
+        - kube-scheduler
+
+    - name: Update apt-get repo and cache
+      apt: update_cache=yes force_apt_get=yes
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
+
+    - name: Upload nginx configuration
+      copy: 
+        src: "../etc/kubernetes.default.svc.cluster.local"
+        dest: "/etc/nginx/sites-available/kubernetes.default.svc.cluster.local"
+        owner: root
+        group: root
+
+    - name: Create a symbolic link for nginx conf
+      file:
+        src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+        dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
+        owner: root
+        group: root
+        state: link
+
+    - name: Reload Daemon Systemd
+      systemd:
+        daemon_reload: true
+    
+    - name: Restart etcd service
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: true
+
+    - name: Upload RBAC configuration
+      copy:
+        src: "../etc/rbac.yaml"
+        dest: "/etc/kubernentes/config/"
+        owner: root
+        group: root
+
+    - name: Apply RBAC configuration
+      when: inventory_hostname in groups['master1']
+      shell: kubectl apply --kubeconfig /srv/cert/admin.kubeconfig -f /etc/kubernentes/config/rbac.yaml

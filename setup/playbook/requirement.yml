@@ -1,0 +1,16 @@
+- hosts:
+    - datacenter
+  gather_facts: yes  
+  become: yes
+  tasks: 
+    - name: download requirement
+      get_url:
+        url: "{{ item }}"
+        dest: /usr/local/bin/
+        mode: '0755'
+      loop:
+        - https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssl
+        - https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssljson
+        - https://storage.googleapis.com/kubernetes-release/release/v1.26.0/bin/linux/amd64/kubectl
+
+      

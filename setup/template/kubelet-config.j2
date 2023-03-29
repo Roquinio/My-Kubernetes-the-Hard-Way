@@ -1,0 +1,28 @@
+---
+{% if inventory_hostname == "192.168.1.123" %}
+  {% set certfile = "worker1.pem" %}
+  {% set keyfile = "worker1-key.pem" %}
+{% else %}
+  {% set certfile = "worker2.pem" %}
+  {% set keyfile = "worker2-key.pem" %}
+{% endif %}
+
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    enabled: true
+  x509:
+    clientCAFile: "/var/lib/kubernetes/ca.pem"
+authorization:
+  mode: Webhook
+clusterDomain: "cluster.local"
+clusterDNS:
+  - "10.32.0.10"
+podCIDR: "10.1.0.0/22"
+resolvConf: "/run/systemd/resolve/resolv.conf"
+runtimeRequestTimeout: "15m"
+tlsCertFile: "/var/lib/kubelet/{{ certfile }}"
+tlsPrivateKeyFile: "/var/lib/kubelet/{{ keyfile }}"
